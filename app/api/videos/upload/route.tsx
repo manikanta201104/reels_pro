@@ -1,6 +1,8 @@
 // app/api/videos/upload/route.tsx
 import { NextResponse } from "next/server";
 import ImageKit from "imagekit";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectToDatabase } from "@/lib/db";
 import Video from "@/models/Video";
 
@@ -14,14 +16,19 @@ const imagekit = new ImageKit({
 
 export async function POST(request: Request) {
   try {
+    // Get the session using NextAuth
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || !session.user.id) {
+      return NextResponse.json(
+        { error: "You must be logged in to upload a video" },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
     // Connect to the database
     await connectToDatabase();
-
-    // Get userId from cookies
-    const userId = request.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // Parse the form data
     const formData = await request.formData();
