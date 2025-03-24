@@ -11,6 +11,7 @@ const imagekit = new ImageKit({
   urlEndpoint: process.env.NEXT_PUBLIC_URL_ENDPOINT || "",
 });
 
+
 export async function POST(request: Request) {
   try {
     // Connect to the database
