@@ -1,83 +1,76 @@
-// app/api/videos/upload/route.ts
-import { NextRequest, NextResponse } from "next/server";
+// app/api/videos/upload/route.tsx
+import { NextResponse } from "next/server";
+import ImageKit from "imagekit";
 import { connectToDatabase } from "@/lib/db";
 import Video from "@/models/Video";
-import ImageKit from "imagekit";
 
-// Initialize ImageKit (if you're using it)
+// Initialize ImageKit with environment variables
 const imagekit = new ImageKit({
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT!,
+  publicKey: process.env.NEXT_PUBLIC_PUBLIC_KEY || "",
+  privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "",
+  urlEndpoint: process.env.NEXT_PUBLIC_URL_ENDPOINT || "",
 });
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // Get userId from the request header
-    const userId = req.headers.get("x-user-id");
+    // Connect to the database
+    await connectToDatabase();
+
+    // Get userId from cookies
+    const userId = request.headers.get("x-user-id");
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Parse the FormData
-    const formData = await req.formData();
+    // Parse the form data
+    const formData = await request.formData();
+    const videoFile = formData.get("video") as File;
+    const thumbnailFile = formData.get("thumbnail") as File;
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
-    const videoFile = formData.get("videoFile") as File;
-    const thumbnailFile = formData.get("thumbnailFile") as File;
 
-    if (!title || !description || !videoFile || !thumbnailFile) {
+    if (!videoFile || !thumbnailFile || !title) {
       return NextResponse.json(
-        { error: "All fields are required" },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // Upload video to ImageKit
+    // Convert files to buffers
     const videoBuffer = Buffer.from(await videoFile.arrayBuffer());
+    const thumbnailBuffer = Buffer.from(await thumbnailFile.arrayBuffer());
+
+    // Upload video to ImageKit
     const videoUploadResponse = await imagekit.upload({
       file: videoBuffer,
-      fileName: videoFile.name,
+      fileName: `video-${Date.now()}.mp4`,
       folder: "/videos",
     });
 
     // Upload thumbnail to ImageKit
-    const thumbnailBuffer = Buffer.from(await thumbnailFile.arrayBuffer());
     const thumbnailUploadResponse = await imagekit.upload({
       file: thumbnailBuffer,
-      fileName: thumbnailFile.name,
+      fileName: `thumbnail-${Date.now()}.jpg`,
       folder: "/thumbnails",
     });
 
-    // Connect to the database
-    await connectToDatabase();
-
-    // Save the video to MongoDB
-    const newVideo = new Video({
+    // Create a new video document
+    const video = new Video({
+      userId,
       title,
       description,
       videoUrl: videoUploadResponse.url,
       thumbnailUrl: thumbnailUploadResponse.url,
-      userId,
-      transformation: {
-        height: 1080,
-        width: 1920,
-        quality: 80,
-      },
     });
 
-    await newVideo.save();
+    // Save the video to the database
+    await video.save();
 
-    return NextResponse.json(
-      { message: "Video uploaded successfully" },
-      { status: 200 }
-    );
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred";
+    return NextResponse.json({ success: true, video }, { status: 201 });
+  } catch (error) {
     console.error("Error uploading video:", error);
     return NextResponse.json(
-      { error: "Failed to upload video", details: errorMessage },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }
