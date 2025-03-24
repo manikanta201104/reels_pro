@@ -5,13 +5,12 @@ import nextPlugin from "@next/eslint-plugin-next";
 
 export default [
   {
-    // Specify files to lint, but exclude .next
     files: ["**/*.{js,jsx,ts,tsx}"],
     ignores: [
-      ".next/**", // Ignore all files in .next directory
-      "node_modules/**", // Ignore node_modules
-      "dist/**", // Ignore any dist directory (if applicable)
-      "build/**", // Ignore any build directory (if applicable)
+      ".next/**", // Ignore generated files in .next directory
+      "node_modules/**",
+      "dist/**",
+      "build/**",
     ],
     languageOptions: {
       parser: tseslint.parser,
@@ -20,14 +19,13 @@ export default [
         sourceType: "module",
       },
       globals: {
-        // Define global variables to avoid no-undef errors
-        React: "readonly", // For React (used in JSX/TSX files)
-        console: "readonly", // For console (used in Node.js)
-        process: "readonly", // For process (used in Node.js)
-        fetch: "readonly", // For fetch (available in browser/Node.js)
-        setTimeout: "readonly", // For setTimeout (available in browser/Node.js)
-        document: "readonly", // For document (used in browser)
-        Buffer: "readonly", // For Buffer (used in Node.js)
+        React: "readonly",
+        console: "readonly",
+        process: "readonly",
+        fetch: "readonly",
+        setTimeout: "readonly",
+        document: "readonly",
+        Buffer: "readonly",
       },
     },
     plugins: {
@@ -37,9 +35,8 @@ export default [
       ...eslint.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
       ...nextPlugin.configs.recommended.rules,
-      // Customize rules to fix no-unused-vars errors
-      "no-unused-vars": "off", // Disable base no-unused-vars rule
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }], // Allow unused vars starting with _
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
 ];

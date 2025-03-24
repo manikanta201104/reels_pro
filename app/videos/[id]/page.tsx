@@ -3,14 +3,19 @@ import { connectToDatabase } from "@/lib/db";
 import Video from "@/models/Video";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import Image from "next/image"; // Import Image component
 
 interface VideoPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>; // Type params as a Promise
 }
 
 export default async function VideoPage({ params }: VideoPageProps) {
+  // Resolve the params Promise
+  const resolvedParams = await params;
+  const { id } = resolvedParams;
+
   // Get userId from cookie
-  const cookieStore = await cookies(); // Await the cookies() function
+  const cookieStore = await cookies();
   const userId = cookieStore.get("userId")?.value;
 
   if (!userId) {
@@ -21,7 +26,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
   await connectToDatabase();
 
   // Fetch the video
-  const video = await Video.findById(params.id);
+  const video = await Video.findById(id);
   if (!video) {
     notFound(); // Returns a 404 if the video doesn't exist
   }
@@ -33,7 +38,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
     await connectToDatabase();
 
     // Refetch the video to ensure it still exists
-    const videoToDelete = await Video.findById(params.id);
+    const videoToDelete = await Video.findById(id);
     if (!videoToDelete) {
       throw new Error("Video not found");
     }
@@ -44,7 +49,7 @@ export default async function VideoPage({ params }: VideoPageProps) {
     }
 
     // Delete the video
-    await Video.findByIdAndDelete(params.id);
+    await Video.findByIdAndDelete(id);
     redirect("/");
   };
 
@@ -57,10 +62,12 @@ export default async function VideoPage({ params }: VideoPageProps) {
       <p>
         <strong>Description:</strong> {video.description || "No description"}
       </p>
-      <img
+      <Image
         src={video.thumbnailUrl}
         alt={video.title || "Video thumbnail"}
         className="w-full max-w-lg mt-4"
+        width={640} // Adjust based on your design
+        height={360} // Adjust based on your design
       />
       <video
         controls={video.controls ?? true}
