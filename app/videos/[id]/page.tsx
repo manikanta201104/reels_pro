@@ -1,69 +1,81 @@
-// app/api/videos/[id]/route.ts
-import { NextRequest, NextResponse } from "next/server";
+// app/videos/[id]/page.tsx
 import { connectToDatabase } from "@/lib/db";
 import Video from "@/models/Video";
+import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    // Get userId from the request header
-    const userId = req.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+interface VideoPageProps {
+  params: { id: string };
+}
 
+export default async function VideoPage({ params }: VideoPageProps) {
+  // Get userId from cookie
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("userId")?.value;
+
+  if (!userId) {
+    redirect("/login"); // Redirect to login if userId is not found
+  }
+
+  // Connect to the database
+  await connectToDatabase();
+
+  // Fetch the video
+  const video = await Video.findById(params.id);
+  if (!video) {
+    notFound(); // Returns a 404 if the video doesn't exist
+  }
+
+  // Server action to handle deletion
+  const handleDelete = async () => {
+    "use server";
+    // Reconnect to the database in the server action
     await connectToDatabase();
 
-    // Find the video
-    const video = await Video.findById(params.id);
-    if (!video) {
-      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+    // Refetch the video to ensure it still exists
+    const videoToDelete = await Video.findById(params.id);
+    if (!videoToDelete) {
+      throw new Error("Video not found");
     }
 
-    // Check if the user owns the video (if userId field exists in the schema)
-    // If you didn't add userId to the schema, comment out this check
-    if (video.userId && video.userId.toString() !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Check if the user owns the video
+    if (videoToDelete.userId && videoToDelete.userId.toString() !== userId) {
+      throw new Error("Forbidden");
     }
 
     // Delete the video
     await Video.findByIdAndDelete(params.id);
+    redirect("/");
+  };
 
-    return NextResponse.json(
-      { message: "Video deleted successfully" },
-      { status: 200 }
-    );
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred";
-    console.error("Error deleting video:", error);
-    return NextResponse.json(
-      { error: "Failed to delete video", details: errorMessage },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    await connectToDatabase();
-    const video = await Video.findById(params.id);
-    if (!video) {
-      return NextResponse.json({ error: "Video not found" }, { status: 404 });
-    }
-    return NextResponse.json(video, { status: 200 });
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred";
-    console.error("Error fetching video:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch video", details: errorMessage },
-      { status: 500 }
-    );
-  }
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-4">Video Details</h1>
+      <p>
+        <strong>Title:</strong> {video.title || "Untitled"}
+      </p>
+      <p>
+        <strong>Description:</strong> {video.description || "No description"}
+      </p>
+      <img
+        src={video.thumbnailUrl}
+        alt={video.title || "Video thumbnail"}
+        className="w-full max-w-lg mt-4"
+      />
+      <video
+        controls={video.controls ?? true}
+        className="w-full max-w-lg mt-4"
+        height={video.transformation?.height || 1080}
+        width={video.transformation?.width || 1920}
+      >
+        <source src={video.videoUrl} type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+      <form action={handleDelete} className="mt-4">
+        <button type="submit" className="btn btn-error">
+          Delete Video
+        </button>
+      </form>
+    </div>
+  );
 }
