@@ -10,7 +10,7 @@ interface VideoPageProps {
 
 export default async function VideoPage({ params }: VideoPageProps) {
   // Get userId from cookie
-  const cookieStore = await cookies();
+  const cookieStore = await cookies(); // Await the cookies() function
   const userId = cookieStore.get("userId")?.value;
 
   if (!userId) {
