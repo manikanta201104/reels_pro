@@ -1,133 +1,140 @@
-// app/components/VideoUploadForm.tsx
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { IKUploadResponse } from "imagekitio-next/dist/types/components/IKUpload/props";
+import { Loader2 } from "lucide-react";
 import { useNotification } from "./Notification";
+import { apiClient } from "@/lib/api-client";
+import FileUpload from "./FileUpload";
+
+interface VideoFormData {
+  title: string;
+  description: string;
+  videoUrl: string;
+  thumbnailUrl: string;
+}
 
 export default function VideoUploadForm() {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { showNotification } = useNotification();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !description || !videoFile || !thumbnailFile) {
-      showNotification("All fields are required", "error");
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<VideoFormData>({
+    defaultValues: {
+      title: "",
+      description: "",
+      videoUrl: "",
+      thumbnailUrl: "",
+    },
+  });
+
+  const handleUploadSuccess = (response: IKUploadResponse) => {
+    setValue("videoUrl", response.filePath);
+    setValue("thumbnailUrl", response.thumbnailUrl || response.filePath);
+    showNotification("Video uploaded successfully!", "success");
+  };
+
+  const handleUploadProgress = (progress: number) => {
+    setUploadProgress(progress);
+  };
+
+  const onSubmit = async (data: VideoFormData) => {
+    if (!data.videoUrl) {
+      showNotification("Please upload a video first", "error");
       return;
     }
 
-    setUploading(true);
-
+    setLoading(true);
     try {
-      const userId = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("userId="))
-        ?.split("=")[1] || "";
+      await apiClient.createVideo(data);
+      showNotification("Video published successfully!", "success");
 
-      if (!userId) {
-        showNotification("You must be logged in to upload a video", "error");
-        setUploading(false);
-        return;
-      }
-
-      // Create a FormData object to send the files
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("description", description);
-      formData.append("videoFile", videoFile);
-      formData.append("thumbnailFile", thumbnailFile);
-
-      const res = await fetch("/api/videos/upload", {
-        method: "POST",
-        headers: {
-          "x-user-id": userId,
-        },
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        showNotification("Video uploaded successfully", "success");
-        router.push("/");
-      } else {
-        showNotification(data.error || "Failed to upload video", "error");
-      }
+      // Reset form after successful submission
+      setValue("title", "");
+      setValue("description", "");
+      setValue("videoUrl", "");
+      setValue("thumbnailUrl", "");
+      setUploadProgress(0);
     } catch (error) {
-      showNotification("An error occurred while uploading the video", "error");
+      showNotification(
+        error instanceof Error ? error.message : "Failed to publish video",
+        "error"
+      );
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">Upload Video</h1>
-      <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-4">
-        <div>
-          <label htmlFor="title" className="block mb-1">
-            Title
-          </label>
-          <input
-            type="text"
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="input input-bordered w-full"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="description" className="block mb-1">
-            Description
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="textarea textarea-bordered w-full"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="videoFile" className="block mb-1">
-            Video File
-          </label>
-          <input
-            type="file"
-            id="videoFile"
-            accept="video/*"
-            onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-            className="file-input file-input-bordered w-full"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="thumbnailFile" className="block mb-1">
-            Thumbnail File
-          </label>
-          <input
-            type="file"
-            id="thumbnailFile"
-            accept="image/*"
-            onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
-            className="file-input file-input-bordered w-full"
-            required
-          />
-        </div>
-        <button
-          type="submit"
-          className="btn btn-primary w-full"
-          disabled={uploading}
-        >
-          {uploading ? "Uploading..." : "Upload Video"}
-        </button>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="form-control">
+        <label className="label">Title</label>
+        <input
+          type="text"
+          className={`input input-bordered ${
+            errors.title ? "input-error" : ""
+          }`}
+          {...register("title", { required: "Title is required" })}
+        />
+        {errors.title && (
+          <span className="text-error text-sm mt-1">
+            {errors.title.message}
+          </span>
+        )}
+      </div>
+
+      <div className="form-control">
+        <label className="label">Description</label>
+        <textarea
+          className={`textarea textarea-bordered h-24 ${
+            errors.description ? "textarea-error" : ""
+          }`}
+          {...register("description", { required: "Description is required" })}
+        />
+        {errors.description && (
+          <span className="text-error text-sm mt-1">
+            {errors.description.message}
+          </span>
+        )}
+      </div>
+
+      <div className="form-control">
+        <label className="label">Upload Video</label>
+        <FileUpload
+          fileType="video"
+          onSuccess={handleUploadSuccess}
+          onProgress={handleUploadProgress}
+        />
+        {uploadProgress > 0 && (
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+            <div
+              className="bg-primary h-2.5 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      <button
+        type="submit"
+        className="btn btn-primary btn-block"
+        disabled={loading || !uploadProgress}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Publishing Video...
+          </>
+        ) : (
+          "Publish Video"
+        )}
+      </button>
+    </form>
   );
 }
