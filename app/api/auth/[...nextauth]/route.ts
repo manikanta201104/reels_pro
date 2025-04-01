@@ -1,19 +1,18 @@
-// app/api/auth/[...nextauth]/route.ts
-import NextAuth from "next-auth";
+import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
-import type { AuthOptions, SessionStrategy, Session } from "next-auth";
+import type { Session, User as NextAuthUser } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 
-// Define the User type (if not already in next-auth.d.ts)
+// Define the User type
 interface User {
   id: string;
   email?: string | null;
 }
 
-const authOptions: AuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -33,15 +32,12 @@ const authOptions: AuthOptions = {
           throw new Error("No user found with this email");
         }
 
-        const isValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
+        const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) {
           throw new Error("Invalid password");
         }
 
-        return { id: user._id.toString(), email: user.email };
+        return { id: user._id.toString(), email: user.email } as NextAuthUser;
       },
     }),
   ],
@@ -63,10 +59,11 @@ const authOptions: AuthOptions = {
     signIn: "/login",
   },
   session: {
-    strategy: "jwt" as SessionStrategy,
+    strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export const handler = NextAuth(authOptions);
+// Correct Next.js 15+ API Route Export
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
