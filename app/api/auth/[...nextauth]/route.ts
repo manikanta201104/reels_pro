@@ -4,8 +4,16 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import type { AuthOptions, SessionStrategy, Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 
-export const authOptions = {
+// Define the User type (if not already in next-auth.d.ts)
+interface User {
+  id: string;
+  email?: string | null;
+}
+
+const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -38,13 +46,13 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }: { session: Session; token: JWT }) {
       if (token && session.user) {
         session.user.id = token.sub as string;
       }
       return session;
     },
-    async jwt({ token, user }: { token: any; user?: { id: string } }) {
+    async jwt({ token, user }: { token: JWT; user?: User }) {
       if (user) {
         token.sub = user.id;
       }
@@ -55,7 +63,7 @@ export const authOptions = {
     signIn: "/login",
   },
   session: {
-    strategy: "jwt" as const,
+    strategy: "jwt" as SessionStrategy,
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

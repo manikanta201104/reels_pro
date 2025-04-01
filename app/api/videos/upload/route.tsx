@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import ImageKit from "imagekit";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth"; // Updated import
 import { connectToDatabase } from "@/lib/db";
 import Video from "@/models/Video";
 
@@ -12,7 +12,6 @@ const imagekit = new ImageKit({
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "",
   urlEndpoint: process.env.NEXT_PUBLIC_URL_ENDPOINT || "",
 });
-
 
 export async function POST(request: Request) {
   try {
